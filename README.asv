@@ -1,0 +1,17 @@
+Abstarct:
+Automated detection and classification of retinal abnormalities in Optical Coherence Tomography (OCT) 
+images are critical for early diagnosis and effective treatment planning in ophthalmology. In this work, a hybrid 
+methodology is introduced that combines traditional image processing techniques with deep learning for improved 
+segmentation and classification accuracy. The preprocessing pipeline begins with grayscale conversion and contrast 
+enhancement using Adaptive Histogram Equalization (CLAHE). Segmentation is performed using a combination of 
+Otsu’s thresholding, morphological operations, and K-Means clustering, followed by refinement using the Active Contour 
+(Snake) algorithm. These steps isolate key regions of interest in the retinal layers, focusing on abnormalities such as fluid
+filled areas or distorted tissue structures. From the segmented images, quantitative features including area, eccentricity, 
+perimeter, and circularity are extracted to understand the shape characteristics of the abnormal regions. These segmented 
+images are then used to train a deep learning model based on the GoogleNet architecture, enabling robust classification of 
+retinal conditions. During testing, raw OCT scan images undergo the same segmentation and feature extraction pipeline 
+before classification, ensuring consistency between training and testing datasets. The integrated approach leverages the 
+precision of classical segmentation techniques and the powerful feature learning capabilities of deep convolutional 
+networks. This method enhances the reliability of OCT-based diagnostic systems and can be potentially extended to other 
+forms of medical imaging. The system provides a cost-effective and scalable solution for aiding ophthalmologists in the 
+early detection of retinal diseases such as age-related macular degeneration and diabetic retinopathy.
