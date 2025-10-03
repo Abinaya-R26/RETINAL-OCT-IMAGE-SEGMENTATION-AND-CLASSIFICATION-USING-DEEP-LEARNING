@@ -1,0 +1,161 @@
+img = imread('normal15.png'); % Load OCT image
+
+% Convert to grayscale if needed
+if size(img, 3) == 3
+    gray_img = rgb2gray(img);
+else
+    gray_img = im2gray(img);
+end
+
+% Resize to standard size
+resized_img = imresize(gray_img, [256 256]);
+
+% Apply Adaptive Histogram Equalization (CLAHE)
+enhanced_img = adapthisteq(resized_img);
+
+% Display both original and enhanced images side by side
+figure;
+
+subplot(1, 2, 1); % Left side
+imshow(resized_img);
+title('Original Grayscale Image');
+
+subplot(1, 2, 2); % Right side
+imshow(enhanced_img);
+title('Enhanced Grayscale Image (CLAHE)');
+
+%Otus's Thresholding for initial segmentation
+
+level = graythresh(enhanced_img); % Compute optimal threshold
+binary_img = imbinarize(enhanced_img, level); % Apply thresholding
+
+figure;
+imshow(binary_img);
+title('Otsu Thresholding Segmentation');
+
+%morphological processing for refinement
+
+binary_img = bwareaopen(binary_img, 100); % Remove small objects
+se = strel('disk', 5); % Create a structuring element
+closed_img = imclose(binary_img, se); % Close small gaps
+
+figure;
+imshow(closed_img);
+title('Refined Segmentation');
+
+%Active Contour (Snake Algorithm) for Precise Segmentation
+
+% Create an initial mask with the same size as the image
+mask = zeros(size(enhanced_img)); % Create an empty mask of the same size
+mask(50:150, 50:150) = 1; % Initialize a region of interest (adjust this region)
+
+% Apply Active Contour (Snake) Method
+cnv_mask = activecontour(enhanced_img, mask, 300, 'edge');
+
+% Display the results
+figure;
+imshow(cnv_mask);
+title('Active Contour Segmentation');
+
+% Reshape the image into a 2D array (each pixel is a data point)
+pixel_values = double(resized_img(:));
+
+% Apply K-means clustering with 2 clusters (background and CNV)
+num_clusters = 2;
+[cluster_idx, cluster_centers] = kmeans(pixel_values, num_clusters);
+
+% Reshape the cluster indices into the original image dimensions
+segmented_img = reshape(cluster_idx, size(resized_img));
+
+% Display the results
+figure;
+imshow(segmented_img, []);
+title('K-means Segmentation');
+
+% Identify unique cluster labels
+cluster_labels = unique(segmented_img);
+
+% Compute the pixel count for each cluster
+cluster_counts = histc(segmented_img(:), cluster_labels);
+
+% Find the largest cluster (excluding background if needed)
+[~, largest_cluster_idx] = max(cluster_counts);
+
+% Create a binary mask for the largest segmented region
+largest_cluster_mask = (segmented_img == largest_cluster_idx);
+
+% Extract pixel values from the largest region
+segmented_pixels = pixel_values(cluster_idx == largest_cluster_idx);
+
+% Compute region properties
+region_stats = regionprops(largest_cluster_mask, 'Area', 'Perimeter', 'Eccentricity', 'Solidity', 'MajorAxisLength', 'MinorAxisLength', 'Circularity');
+
+% Extract relevant shape features
+area_pixels = region_stats.Area;
+perimeter_pixels = region_stats.Perimeter;
+eccentricity = region_stats.Eccentricity;
+solidity = region_stats.Solidity;
+major_axis = region_stats.MajorAxisLength;
+minor_axis = region_stats.MinorAxisLength;
+circularity = (4 * pi * area_pixels) / (perimeter_pixels^2); % Circularity formula
+
+% Display results
+fprintf('🔹 Shape Analysis of the Largest Segmented Region 🔹\n');
+fprintf('Area: %d pixels\n', area_pixels);
+fprintf('Perimeter: %.2f pixels\n', perimeter_pixels);
+fprintf('Eccentricity: %.2f\n', eccentricity);
+fprintf('Solidity: %.2f\n', solidity);
+fprintf('Major Axis Length: %.2f pixels\n', major_axis);
+fprintf('Minor Axis Length: %.2f pixels\n', minor_axis);
+fprintf('Circularity: %.2f\n', circularity);
+
+pseudo_ground_truth = cnv_mask; % Use Active Contour result as ground truth
+
+
+% Convert both to double (or logical if binary classification)
+segmented_flat = double(segmented_img(:));
+ground_truth_flat = double(pseudo_ground_truth(:));  % Ensure same type
+
+% Compute confusion matrix
+conf_mat = confusionmat(ground_truth_flat, segmented_flat);
+
+% Display confusion matrix
+disp('Confusion Matrix:');
+disp(conf_mat);
+
+% Plot confusion matrix
+figure;
+heatmap(conf_mat, 'XLabel', 'Predicted', 'YLabel', 'Actual', ...
+    'Title', 'Confusion Matrix (Pseudo Ground Truth)', 'Colormap', jet);
+
+% Get pixel values of segmented region
+segmented_pixel_values = resized_img(largest_cluster_mask);
+
+% Plot histogram
+figure;
+histogram(resized_img(:), 256, 'FaceColor', 'b'); % Original Image
+hold on;
+histogram(segmented_pixel_values, 256, 'FaceColor', 'r'); % Segmented Region
+hold off;
+title('Histogram of Pixel Intensity');
+xlabel('Intensity Value');
+ylabel('Frequency');
+legend('Original Image', 'Segmented Region');
+
+% Extract boundary
+[B, ~] = bwboundaries(largest_cluster_mask, 'noholes');
+
+% Display original image
+figure;
+imshow(resized_img);
+hold on;
+
+% Overlay contour
+for k = 1:length(B)
+    boundary = B{k};
+    plot(boundary(:,2), boundary(:,1), 'r', 'LineWidth', 2);
+end
+
+title('Contour of Segmented Region');
+hold off;
+
